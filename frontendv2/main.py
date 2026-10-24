@@ -90,10 +90,7 @@ with chat_tab:
     upload_nonce_key = f"uploader_nonce_{chat['id']}"
     upload_nonce = st.session_state.get(upload_nonce_key, 0)
 
-    mic_nonce_key = f"mic_nonce_{chat['id']}"
-    mic_nonce = st.session_state.get(mic_nonce_key, 0)
-
-    attach_column, mic_column, _ = st.columns([1, 1, 10])
+    attach_column, _ = st.columns([1, 11])
 
     with attach_column, st.popover("📎"):
         st.caption("Upload a lab report (PDF or photo, max 15 MB)")
@@ -101,14 +98,6 @@ with chat_tab:
             "Upload",
             type=["pdf", "png", "jpg", "jpeg"],
             key=f"uploader_{chat['id']}_{upload_nonce}",
-            label_visibility="collapsed",
-        )
-
-    with mic_column, st.popover("🎙️"):
-        st.caption("Record your question, then close this popover")
-        audio_value = st.audio_input(
-            "Record",
-            key=f"mic_{chat['id']}_{mic_nonce}",
             label_visibility="collapsed",
         )
 
@@ -154,24 +143,11 @@ with chat_tab:
 
             st.rerun()
 
-    # ----------------------------------------------------------- voice
-
-    voice_prompt = None
-
-    if audio_value is not None:
-        with st.spinner("Transcribing…"):
-            try:
-                voice_prompt = api.transcribe_voice(audio_value.read())
-            except api.ApiError as error:
-                st.error(str(error))
-
-        st.session_state[mic_nonce_key] = mic_nonce + 1
-
     # ------------------------------------------------------------ chat
 
     typed_prompt = st.chat_input("Ask your medical question…")
 
-    prompt = pending_prompt or voice_prompt or typed_prompt
+    prompt = pending_prompt or typed_prompt
 
     if prompt:
         with st.chat_message("user"):

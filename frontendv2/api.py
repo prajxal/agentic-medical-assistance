@@ -220,21 +220,8 @@ def wake_backend() -> None:
 # ----------------------------------------------------------------- chat
 
 
-def chat(query: str, session_id: str, location: str = "") -> dict:
-
-    return _request(
-        "POST",
-        "/chat",
-        json={"query": query, "session_id": session_id, "location": location},
-    ).json()
-
-
 def chat_stream(query: str, session_id: str, location: str = ""):
-    """Yield (event, payload) pairs from the streaming chat endpoint.
-
-    Falls back to the blocking endpoint when streaming is unavailable, so
-    the UI keeps working against an older backend.
-    """
+    """Yield (event, payload) pairs from the streaming chat endpoint."""
 
     try:
         response = requests.post(
@@ -244,15 +231,10 @@ def chat_stream(query: str, session_id: str, location: str = ""):
             timeout=_timeout(),
             stream=True,
         )
-    except (requests.Timeout, requests.ConnectionError):
-        yield "message", {"response": chat(query, session_id, location)["response"]}
-        return
-
-    if response.status_code == 404:
-        result = chat(query, session_id, location)
-        yield "message", {"response": result["response"]}
-        yield "suggestions", {"suggestions": result.get("suggestions", [])}
-        return
+    except (requests.Timeout, requests.ConnectionError) as exc:
+        raise ApiError(
+            "Can't reach the assistant right now. It may be starting up - please try again in a minute."
+        ) from exc
 
     _handle(response)
 
@@ -346,17 +328,6 @@ def download_report_pdf(session_id: str) -> bytes:
     ).content
 
 
-# ---------------------------------------------------------------- voice
-
-
-def transcribe_voice(audio_bytes: bytes) -> str:
-    return _request(
-        "POST",
-        "/transcribe",
-        files={"file": ("recording.wav", audio_bytes, "audio/wav")},
-    ).json()["text"]
-
-
 # ----------------------------------------------------------------- auth
 
 
@@ -396,10 +367,6 @@ def logout() -> None:
     # The token is discarded locally regardless of the server's answer.
     with contextlib.suppress(ApiError):
         _request("POST", "/auth/logout")
-
-
-def whoami() -> dict:
-    return _request("GET", "/auth/me").json()
 
 
 def change_password(current_password: str, new_password: str) -> None:

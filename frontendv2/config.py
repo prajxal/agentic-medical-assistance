@@ -48,8 +48,6 @@ FASTAPI_URL = _normalise_url(_setting("FASTAPI_URL", "http://127.0.0.1:8000"))
 # Sent as X-API-Key. Required whenever the backend has API_KEYS configured.
 API_KEY = _setting("MEDICAL_ASSISTANT_API_KEY", "")
 
-APP_NAME = "🩺 Agentic Medical Assistant"
-
 DEFAULT_CHAT_NAME = "New Chat"
 
 # Connect and read timeouts, in seconds. Every call previously omitted a

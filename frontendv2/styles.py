@@ -197,9 +197,8 @@ html, body, [class*="css"], .stMarkdown {
     min-height: 2.6rem;
 }
 
-/* Attach and microphone. Both are popovers, so the old .icon-btn rule
-   for buttons never matched them and they rendered as default pills
-   with a dropdown chevron. */
+/* Attach. It is a popover, so the old .icon-btn rule for buttons never
+   matched it and it rendered as a default pill with a dropdown chevron. */
 [data-testid="stMain"] [data-testid="stPopover"] button {
     border-radius: 999px !important;
     width: 44px;

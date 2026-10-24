@@ -79,7 +79,6 @@ class Settings(BaseSettings):
     groq_timeout_seconds: float = 25.0
     groq_max_retries: int = 3
     groq_call_budget_seconds: float = 40.0
-    groq_transcription_model: str = "whisper-large-v3-turbo"
 
     # -------------------------------------------------- http
 
@@ -91,7 +90,6 @@ class Settings(BaseSettings):
 
     chat_rate_limit: str = "20/minute"
     upload_rate_limit: str = "5/minute"
-    transcribe_rate_limit: str = "10/minute"
 
     # How many reverse proxies sit in front of this service. Each appends
     # one entry to X-Forwarded-For, so this says how far from the right

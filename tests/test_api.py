@@ -1,4 +1,4 @@
-import io
+import json
 import uuid
 from unittest.mock import patch
 
@@ -69,6 +69,34 @@ def _answer(text="Drink fluids and rest."):
     return {"response": text, "severity": 1, "emergency": False}
 
 
+def _graph(result=None, **kwargs):
+    """Stand in for the graph, yielding one node update per turn."""
+
+    if result is None:
+        return patch("app.api.routes.graph.stream", **kwargs)
+
+    return patch(
+        "app.api.routes.graph.stream",
+        side_effect=lambda *args, **_: iter([{"rag_node": result}]),
+    )
+
+
+def _events(response):
+    """The (event, payload) pairs of a server-sent event stream."""
+
+    events = []
+
+    for block in response.text.strip().split("\n\n"):
+        lines = dict(line.split(": ", 1) for line in block.splitlines())
+        events.append((lines["event"], json.loads(lines["data"])))
+
+    return events
+
+
+def _final_answer(response):
+    return next(payload["response"] for event, payload in _events(response) if event == "message")
+
+
 # --------------------------------------------------------------- meta
 
 
@@ -94,13 +122,15 @@ def test_every_response_carries_a_correlation_id(client):
 
 
 def test_requests_without_credentials_are_rejected(raw_client):
-    response = raw_client.post("/chat", json={"query": "hi", "session_id": str(uuid.uuid4())})
+    response = raw_client.post(
+        "/chat/stream", json={"query": "hi", "session_id": str(uuid.uuid4())}
+    )
     assert response.status_code == 401
 
 
 def test_requests_with_an_unknown_token_are_rejected(raw_client):
     response = raw_client.post(
-        "/chat",
+        "/chat/stream",
         json={"query": "hi", "session_id": str(uuid.uuid4())},
         headers={"Authorization": "Bearer not-a-real-token"},
     )
@@ -109,11 +139,11 @@ def test_requests_with_an_unknown_token_are_rejected(raw_client):
 
 def test_a_valid_token_is_accepted(client, keyed):
     with (
-        patch("app.api.routes.graph.invoke", return_value=_answer()),
+        _graph(_answer()),
         patch("app.api.routes.generate_suggestions", return_value=[]),
     ):
         response = client.post(
-            "/chat",
+            "/chat/stream",
             json={"query": "I feel fine", "session_id": str(uuid.uuid4())},
             headers=keyed["alice"],
         )
@@ -131,11 +161,11 @@ def test_one_caller_cannot_read_another_callers_chat(client, keyed):
     session_id = str(uuid.uuid4())
 
     with (
-        patch("app.api.routes.graph.invoke", return_value=_answer("Your haemoglobin is low.")),
+        _graph(_answer("Your haemoglobin is low.")),
         patch("app.api.routes.generate_suggestions", return_value=[]),
     ):
         client.post(
-            "/chat",
+            "/chat/stream",
             json={"query": "explain my report", "session_id": session_id},
             headers=keyed["alice"],
         )
@@ -176,11 +206,13 @@ def test_sessions_are_listed_per_caller(client, keyed):
     session_id = str(uuid.uuid4())
 
     with (
-        patch("app.api.routes.graph.invoke", return_value=_answer()),
+        _graph(_answer()),
         patch("app.api.routes.generate_suggestions", return_value=[]),
     ):
         client.post(
-            "/chat", json={"query": "hello", "session_id": session_id}, headers=keyed["alice"]
+            "/chat/stream",
+            json={"query": "hello", "session_id": session_id},
+            headers=keyed["alice"],
         )
 
     alice_ids = {s["id"] for s in client.get("/sessions", headers=keyed["alice"]).json()}
@@ -195,12 +227,12 @@ def test_sessions_are_listed_per_caller(client, keyed):
 
 @pytest.mark.parametrize("session_id", ["../../etc/passwd", "a b", "x" * 65, ""])
 def test_malformed_session_ids_are_rejected(client, session_id):
-    response = client.post("/chat", json={"query": "hi", "session_id": session_id})
+    response = client.post("/chat/stream", json={"query": "hi", "session_id": session_id})
     assert response.status_code in (400, 422)
 
 
 def test_empty_query_is_rejected(client):
-    response = client.post("/chat", json={"query": "", "session_id": str(uuid.uuid4())})
+    response = client.post("/chat/stream", json={"query": "", "session_id": str(uuid.uuid4())})
     assert response.status_code == 422
 
 
@@ -307,14 +339,14 @@ def test_deleting_a_session_also_removes_its_vector_store(client):
 
 def test_chat_appends_a_disclaimer(client):
     with (
-        patch("app.api.routes.graph.invoke", return_value=_answer("Rest and fluids.")),
+        _graph(_answer("Rest and fluids.")),
         patch("app.api.routes.generate_suggestions", return_value=[]),
     ):
-        body = client.post(
-            "/chat", json={"query": "I have a cold", "session_id": str(uuid.uuid4())}
-        ).json()
+        response = client.post(
+            "/chat/stream", json={"query": "I have a cold", "session_id": str(uuid.uuid4())}
+        )
 
-    assert "does not replace advice" in body["response"]
+    assert "does not replace advice" in _final_answer(response)
 
 
 def test_an_emergency_result_leads_with_escalation(client):
@@ -325,28 +357,29 @@ def test_an_emergency_result_leads_with_escalation(client):
     }
 
     with (
-        patch("app.api.routes.graph.invoke", return_value=graph_result),
+        _graph(graph_result),
         patch("app.api.routes.generate_suggestions", return_value=[]),
     ):
-        body = client.post(
-            "/chat",
+        response = client.post(
+            "/chat/stream",
             json={"query": "crushing chest pain", "session_id": str(uuid.uuid4())},
-        ).json()
+        )
 
     # "Emergency: True" used to be rendered as a bare field with no
     # instruction to call anyone.
-    assert body["response"].startswith("## ⚠️ Seek emergency care now")
-    assert "112" in body["response"]
+    answer = _final_answer(response)
+    assert answer.startswith("## ⚠️ Seek emergency care now")
+    assert "112" in answer
 
 
 def test_chat_history_is_persisted_server_side(client):
     session_id = str(uuid.uuid4())
 
     with (
-        patch("app.api.routes.graph.invoke", return_value=_answer("Answer one.")),
+        _graph(_answer("Answer one.")),
         patch("app.api.routes.generate_suggestions", return_value=[]),
     ):
-        client.post("/chat", json={"query": "question one", "session_id": session_id})
+        client.post("/chat/stream", json={"query": "question one", "session_id": session_id})
 
     messages = client.get(f"/history?session_id={session_id}").json()["messages"]
 
@@ -355,21 +388,13 @@ def test_chat_history_is_persisted_server_side(client):
 
 
 def test_an_unhandled_error_does_not_leak_internals(client):
-    with patch("app.api.routes.graph.invoke", side_effect=RuntimeError("secret db password")):
-        response = client.post("/chat", json={"query": "hello", "session_id": str(uuid.uuid4())})
+    with _graph(side_effect=RuntimeError("secret db password")):
+        response = client.post(
+            "/chat/stream", json={"query": "hello", "session_id": str(uuid.uuid4())}
+        )
 
-    assert response.status_code == 500
+    assert [event for event, _ in _events(response)] == ["error"]
     assert "secret db password" not in response.text
-
-
-# --------------------------------------------------------------- voice
-
-
-def test_transcribe_rejects_an_empty_recording(client):
-    response = client.post(
-        "/transcribe", files={"file": ("clip.wav", io.BytesIO(b""), "audio/wav")}
-    )
-    assert response.status_code == 400
 
 
 def test_rate_limiting_rejects_a_burst(client):
@@ -382,12 +407,12 @@ def test_rate_limiting_rejects_a_burst(client):
 
     try:
         with (
-            patch("app.api.routes.graph.invoke", return_value=_answer()),
+            _graph(_answer()),
             patch("app.api.routes.generate_suggestions", return_value=[]),
         ):
             codes = [
                 client.post(
-                    "/chat", json={"query": "hello", "session_id": str(uuid.uuid4())}
+                    "/chat/stream", json={"query": "hello", "session_id": str(uuid.uuid4())}
                 ).status_code
                 for _ in range(25)
             ]

@@ -69,7 +69,7 @@ services:
     runtime: python
     plan: starter
     healthCheckPath: /_stcore/health
-    buildCommand: pip install -r requirements-frontend.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: >-
       streamlit run frontendv2/main.py
       --server.port $PORT

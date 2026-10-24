@@ -24,9 +24,6 @@ sessions_store.json
 *.pdf
 repomix-output.md
 
-requirements-dev.txt
-requirements-frontend.txt
-
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/

@@ -1,9 +1,9 @@
 """Request rate limiting.
 
-Every /chat call spends money (at least one Groq completion, plus the
-follow-up suggestion generation) and /transcribe hits Whisper. All of it
-was previously unauthenticated and unmetered, so a trivial loop could
-exhaust the API quota - and safe_invoke's retry-with-sleep behaviour then
+Every chat turn spends money (at least one Groq completion, plus the
+follow-up suggestion generation). All of it was previously
+unauthenticated and unmetered, so a trivial loop could exhaust the API
+quota - and safe_invoke's retry-with-sleep behaviour then
 converted the resulting rate limits into held server threads.
 
 Sign-in and sign-up have no credential to meter by, so they fall back to

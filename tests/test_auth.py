@@ -238,13 +238,13 @@ def test_two_users_cannot_see_each_others_chats(client):
 
     with (
         patch(
-            "app.api.routes.graph.invoke",
-            return_value={"response": "Your haemoglobin is low.", "severity": 1},
+            "app.api.routes.graph.stream",
+            return_value=iter([{"rag_node": {"response": "Your haemoglobin is low."}}]),
         ),
         patch("app.api.routes.generate_suggestions", return_value=[]),
     ):
         client.post(
-            "/chat",
+            "/chat/stream",
             json={"query": "explain my report", "session_id": session_id},
             headers=alice,
         )

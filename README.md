@@ -74,8 +74,7 @@ and a [Groq API key](https://console.groq.com).
 
 ```bash
 python -m venv venv && source venv/bin/activate
-pip install -r requirements-dev.txt
-pip install -r requirements-frontend.txt
+pip install -r requirements.txt
 
 cp .env.example .env      # then fill in GROQ_API_KEY
 ```
@@ -185,15 +184,13 @@ namespace; it never grants access to another account's data.
 | `POST` | `/auth/change-password` | Change password; revokes all other sessions. |
 | `GET` | `/health` | Liveness. |
 | `GET` | `/ready` | Readiness: database, credentials, knowledge base. 503 when unable to serve. |
-| `POST` | `/chat` | One turn. Returns the answer and follow-up suggestions. |
-| `POST` | `/chat/stream` | The same turn as server-sent events, with progress. |
+| `POST` | `/chat/stream` | One turn as server-sent events: progress, the answer, then follow-up suggestions. |
 | `GET` | `/history` | The conversation, server-side. |
 | `GET` | `/sessions` | The caller's chats. |
 | `DELETE`| `/sessions/{id}` | Delete a chat and its report index. |
 | `POST` | `/upload-report` | Accepts a report, returns `202` with a job id. |
 | `GET` | `/report-status/{job_id}` | Poll a report job. |
 | `GET` | `/download-report` | PDF of the analysed report. |
-| `POST` | `/transcribe` | Speech to text. |
 
 Reports are processed off the request path — upload returns immediately and the
 client polls `/report-status`.
@@ -262,9 +259,8 @@ Deploying by hand instead, or on another host, the checklist is:
 | `API_KEYS` + `MEDICAL_ASSISTANT_API_KEY` | The same secret on the API and the frontend. Lets the frontend identify itself so each visitor gets their own allowance. |
 | Health check → `/health` | Liveness. Use this, not `/ready`, which reports degraded while the knowledge base warms up. |
 
-The frontend is a separate service: install `requirements-frontend.txt`, not the
-repository-root one, which is the API's much heavier dependency set. Its
-`FASTAPI_URL` accepts either a full URL or a bare hostname.
+The frontend is a separate service installed from the same `requirements.txt`.
+Its `FASTAPI_URL` accepts either a full URL or a bare hostname.
 
 After the first deploy, `GET /ready` is the thing to look at. It reports the
 database, the credentials and the knowledge base separately, and returns 503 if

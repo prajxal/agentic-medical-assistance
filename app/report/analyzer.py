@@ -21,7 +21,6 @@ BORDERLINE = "Borderline"
 UNKNOWN = "Unknown"
 
 VALID_STATUSES = frozenset({HIGH, LOW, NORMAL, BORDERLINE})
-ABNORMAL_STATUSES = frozenset({HIGH, LOW, BORDERLINE})
 
 
 def _parse_numeric(raw_value):

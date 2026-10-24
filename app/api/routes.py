@@ -1,6 +1,4 @@
 import json
-import os
-import tempfile
 from io import BytesIO
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
@@ -10,13 +8,11 @@ from app.agents.graph import build_state, graph
 from app.api.rate_limit import limiter
 from app.api.schemas import (
     ChatRequest,
-    ChatResponse,
     HealthResponse,
     HistoryResponse,
     JobStatus,
     ReadinessResponse,
     SessionSummary,
-    TranscriptionResponse,
     UploadAccepted,
 )
 from app.api.security import require_owner, validate_session_id
@@ -34,8 +30,6 @@ from app.tools.suggestion_generator import generate_suggestions
 logger = get_logger(__name__)
 
 router = APIRouter()
-
-MAX_AUDIO_BYTES = 25 * 1024 * 1024
 
 
 @router.get("/", tags=["meta"])
@@ -80,49 +74,6 @@ def ready(request: Request):
 
 
 # ---------------------------------------------------------------- chat
-
-
-@router.post("/chat", response_model=ChatResponse, tags=["chat"])
-@limiter.limit(settings.chat_rate_limit)
-def chat(
-    request: Request,
-    response: Response,
-    payload: ChatRequest,
-    owner: str = Depends(require_owner),
-):
-
-    session_id = validate_session_id(payload.session_id)
-
-    history = session_manager.get_messages(session_id, owner=owner)
-
-    result = graph.invoke(
-        build_state(
-            query=payload.query,
-            session_id=session_id,
-            owner=owner,
-            location=payload.location,
-            chat_history=history,
-        )
-    )
-
-    answer = apply_safety(
-        result.get("response") or "I wasn't able to produce an answer to that.",
-        severity=result.get("severity"),
-        emergency=result.get("emergency"),
-    )
-
-    session_manager.add_message(session_id, "user", payload.query, owner=owner)
-    session_manager.add_message(session_id, "assistant", answer, owner=owner)
-
-    # Names the chat after its opening message, so the sidebar is not a
-    # column of identical "New Chat" entries. A no-op once named.
-    session_manager.ensure_chat_name(session_id, payload.query, owner=owner)
-
-    return {
-        "response": answer,
-        "suggestions": generate_suggestions(payload.query, answer),
-        "session_id": session_id,
-    }
 
 
 @router.get("/history", response_model=HistoryResponse, tags=["chat"])
@@ -240,45 +191,6 @@ def download_report(session_id: str, owner: str = Depends(require_owner)):
     )
 
 
-# ---------------------------------------------------------------- voice
-
-
-@router.post("/transcribe", response_model=TranscriptionResponse, tags=["voice"])
-@limiter.limit(settings.transcribe_rate_limit)
-async def transcribe(
-    request: Request,
-    response: Response,
-    file: UploadFile = File(...),
-    owner: str = Depends(require_owner),
-):
-    from app.tools.voice import transcribe_audio
-
-    payload = await file.read(MAX_AUDIO_BYTES + 1)
-
-    if len(payload) > MAX_AUDIO_BYTES:
-        raise HTTPException(
-            status_code=413,  # Content Too Large
-            detail="Recording is too long.",
-        )
-
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Recording is empty.",
-        )
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-        tmp.write(payload)
-        tmp_path = tmp.name
-
-    try:
-        text = transcribe_audio(tmp_path)
-    finally:
-        os.unlink(tmp_path)
-
-    return {"text": text}
-
-
 # ------------------------------------------------------------ streaming
 
 # Human-readable progress for each node, so the client can show what the
@@ -364,8 +276,8 @@ def chat_stream(
         session_manager.add_message(session_id, "user", payload.query, owner=owner)
         session_manager.add_message(session_id, "assistant", final, owner=owner)
 
-        # The UI talks to this endpoint, not /chat - naming the chat only
-        # there meant it never happened in the app itself.
+        # Names the chat after its opening message, so the sidebar is not a
+        # column of identical "New Chat" entries. A no-op once named.
         session_manager.ensure_chat_name(session_id, payload.query, owner=owner)
 
         yield _sse("message", {"response": final})

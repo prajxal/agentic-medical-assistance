@@ -51,10 +51,6 @@ def save_chat(chat: dict) -> None:
     _local()[chat["id"]] = chat
 
 
-def get_chat(chat_id: str) -> dict | None:
-    return _local().get(chat_id)
-
-
 def load_messages(chat_id: str) -> list[dict]:
     """The conversation, from the server."""
 

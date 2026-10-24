@@ -9,12 +9,6 @@ class ChatRequest(BaseModel):
     location: str = Field(default="", max_length=200)
 
 
-class ChatResponse(BaseModel):
-    response: str
-    suggestions: list[str] = Field(default_factory=list)
-    session_id: str
-
-
 class MessageOut(BaseModel):
     role: str
     content: str
@@ -45,10 +39,6 @@ class JobStatus(BaseModel):
     filename: str = ""
     result: dict[str, Any] | None = None
     error: str | None = None
-
-
-class TranscriptionResponse(BaseModel):
-    text: str
 
 
 class HealthResponse(BaseModel):

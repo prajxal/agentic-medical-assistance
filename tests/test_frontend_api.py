@@ -188,7 +188,7 @@ def test_a_write_is_never_repeated():
         patch("api.time.sleep"),
         pytest.raises(api.ApiError),
     ):
-        api._request("POST", "/chat", json={"query": "hi"})
+        api._request("POST", "/chat/stream", json={"query": "hi"})
 
     assert request.call_count == 1
     wake.assert_not_called()
@@ -203,7 +203,7 @@ def test_the_message_says_the_api_is_waking_rather_than_broken():
         patch("api.time.sleep"),
         pytest.raises(api.ApiError) as raised,
     ):
-        api._request("POST", "/chat", json={"query": "hi"})
+        api._request("POST", "/chat/stream", json={"query": "hi"})
 
     message = str(raised.value)
     assert "waking up" in message

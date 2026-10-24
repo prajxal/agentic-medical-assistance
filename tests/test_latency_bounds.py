@@ -112,7 +112,7 @@ def test_suggestions_get_one_short_attempt():
 
 
 def test_the_streaming_endpoint_names_the_chat():
-    """The UI uses /chat/stream; naming only /chat left every chat unnamed."""
+    """A chat is named after its opening message."""
 
     from app.api.main import app
 
@@ -128,7 +128,6 @@ def test_the_streaming_endpoint_names_the_chat():
             patch(
                 "app.api.routes.graph.stream", return_value=iter([{"rag_node": {"response": "ok"}}])
             ),
-            patch("app.api.routes.graph.invoke", return_value={"response": "ok"}),
             patch("app.api.routes.generate_suggestions", return_value=[]),
         ):
             client.post(
