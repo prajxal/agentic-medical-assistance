@@ -1,0 +1,27 @@
+# Streamlit theme.
+#
+# The theme is pinned to light for every viewer.
+#
+# It used to follow each viewer's own preference, but that preference is
+# read twice - Streamlit resolves its base theme one way, and the custom
+# stylesheet read prefers-color-scheme another - and on some machines the
+# two disagreed. Streamlit painted near-black text while the stylesheet
+# painted a dark card behind it, and labels, answers and the BMI value
+# became unreadable. One fixed theme means one set of colours, everywhere.
+
+[theme]
+base = "light"
+primaryColor = "#0d9488"
+backgroundColor = "#ffffff"
+# Streamlit fills input fields with this. It has to differ visibly from
+# the white cards the fields sit on, or the fields disappear into them.
+secondaryBackgroundColor = "#eef2f6"
+textColor = "#0f172a"
+font = "sans serif"
+
+[client]
+showErrorDetails = false
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false
